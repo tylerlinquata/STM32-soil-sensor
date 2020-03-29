@@ -163,13 +163,16 @@ int main(void)
 		// wait for TC
 		while(!(I2C2->ISR & (1 << 6))) {}
 
-		cap = cap_high | cap_low;
-		
-		if(cap > 2000) {
+		if(cap_low > 200) {
 			GPIOC->ODR |= (1 << 9);
 			// GPIOC->ODR &= ~(1 << 7);
 		}
-
+		if(cap_high != 0) {
+			GPIOC->ODR |= (1 << 8);
+		}
+		if((cap_high | cap_low) != 0) {
+			GPIOC->ODR |= (1 << 7);
+		}
 		
   }
   /* USER CODE END 3 */

@@ -80,7 +80,7 @@ int main(void)
 	/*
 	 *	initialize GPIO 
 	 */
-	RCC->AHBENR |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOCEN;  // enable GPIOB and GPIOC 
+	RCC->AHBENR |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOCEN | RCC_AHBENR_GPIOAEN;  // enable GPIOA GPIOB and GPIOC 
 	
 	GPIOB->MODER |= (1 << 23) | (1 << 27) | (1 << 28); // PB11 AF, PB13 AF, PB14 output
 	GPIOC->MODER |= (1 << 0);	// PC0 output 
@@ -177,6 +177,73 @@ int main(void)
   }
   /* USER CODE END 3 */
 
+}
+//*****************************
+//taken from lab 7, sets up the pwm
+//probably does too much and we won't need half of it
+void pwm_init(void) 
+{
+	// Set up pin PA4 for H-bridge PWM output (TIMER 14 CH1)    
+	GPIOA->MODER |= (1 << 9);    
+	GPIOA->MODER &= ~(1 << 8);    
+	// Set PA4 to AF4,   
+	GPIOA->AFR[0] &= 0xFFF0FFFF; // clear PA4 bits,    
+	GPIOA->AFR[0] |= (1 << 18);    
+	
+	// Set up a PA5, PA6 as GPIO output pins for motor direction control    
+	GPIOA->MODER &= 0xFFFFC3FF; // clear PA5, PA6 bits,    
+	GPIOA->MODER |= (1 << 10) | (1 << 12);    
+	
+	//Initialize one direction pin to high, the other low    
+	GPIOA->ODR |= (1 << 5);    
+	GPIOA->ODR &= ~(1 << 6);   
+	
+	// Set up PWM timer    
+	RCC->APB1ENR |= RCC_APB1ENR_TIM14EN;    
+	TIM14->CR1 = 0;                         
+	// Clear control registers    
+	TIM14->CCMR1 = 0;                       
+	// (prevents having to manually clear bits)    
+	TIM14->CCER = 0;    
+
+	// Set output-compare CH1 to PWM1 mode and enable CCR1 preload buffer    
+	TIM14->CCMR1 |= (TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1PE);    
+	TIM14->CCER |= TIM_CCER_CC1E;           // Enable capture-compare channel 1    
+	TIM14->PSC = 1;                         // Run timer on 24Mhz    
+	TIM14->ARR = 1200;                      // PWM at 20kHz    
+	TIM14->CCR1 = 0;                        // Start PWM at 0% duty cycle
+    TIM14->CR1 |= TIM_CR1_CEN;              // Enable timer
+	
+}
+
+//does our EXTI and NVIC setup 
+void NVIC_EXTI_Setup()
+{
+	RCC->APB2ENR  |= RCC_APB2ENR_SYSCFGCOMPEN; // enable SYSCFG
+
+	//TODO: determine if we're actually using line 0 or what
+	// configure EXTI 
+	EXTI->IMR  |= (1 << 0); // unmask interrupt request line 0
+	EXTI->RTSR |= (1 << 0); // rising trigger enabled line 0
+
+	//TODO: determine the proper routing (line 0 or nah)
+	SYSCFG->EXTICR[1] |= (0 << 0) | (0 << 1) | (0 << 2) | (0 << 3); //route PA0 to EXTI 
+	
+	//TODO: implement NVIC Handlers and such, determine priority
+	NVIC_EnableIRQ(/*EXTI0_1_IRQn*/);
+	NVIC_SetPriority(/*EXTI0_1_IRQn*/, 2); //priority set to 2
+	
+
+}
+
+//function that probably needs to be called by the Interrupt handler
+//the handler should call this fucntion then clear the interrupt status register
+// this function should power the motor on for 5 seconds
+void PWM_Motor(void) 
+{
+	//TODO: implement
+	//powers the motor for a short period of time using PWM_Motor
+	//run for like 5 seconds
 }
 
 /** System Clock Configuration

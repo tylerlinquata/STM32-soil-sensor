@@ -51,6 +51,7 @@ void Error_Handler(void);
 void Transmit_Char(char c);
 void Transmit_String(char str[]);
 void configureUART(void);
+void configureI2C2(void);
 char prompt[6] = {'C', 'M', 'D', '?', '\0'};
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -79,36 +80,14 @@ int main(void)
   /* Initialize all configured peripherals */
   
   /* USER CODE BEGIN 2 */
+  // enable GPIOB and GPIOC
+  RCC->AHBENR |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOCEN;
+  
   configureUART();
+  configureI2C2();
   
-  /*
-   *  initialize GPIO
-   */
-  RCC->AHBENR |= RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOCEN;  // enable GPIOB and GPIOC
-  
-  GPIOB->MODER |= (1 << 23) | (1 << 27) | (1 << 28); // PB11 AF, PB13 AF, PB14 output
-  GPIOC->MODER |= (1 << 0);  // PC0 output
-  GPIOC->MODER   |= (1 << 12)   | (1 << 14)
-                |  (1 << 16)  | (1 << 18) ; // initialize LEDS
-  
-  GPIOB->OTYPER |= (1 << 11) | (1 << 13);  // PB11 and PB13 open-drain
-  
-  GPIOB->PUPDR |= (1 << 22) | (1 << 26);   // PB11 and PB13 to pull-up
-  
-  GPIOB->AFR[1] |= (1 << 12) | (5 << 20);   // set PB11 to SDA and PB13 to SCL
-  
-  GPIOB->ODR |= (1 << 14);  // initialize PB14
-  GPIOC->ODR |= (1 << 0);    // initialize PC0
-  GPIOC->ODR |= (0 << 6)   | (0 << 7)  | (0 << 8)  | (0 << 9)  ; // all LEDS off
-  
-  /*
-   *  initialize I2C2
-   */
-  RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;  // emable the ISC2
-  
-  I2C2->TIMINGR |= (0x13 << 0) | (0xF << 8) | (0x2 << 16) | (0x4 << 20) | (1 << 28); // configure timing to 100kHz
-  I2C2->CR1 |= (1 << 0); // enable I2C2
-  
+  // all LEDS off
+  GPIOC->ODR |= (0 << 6)   | (0 << 7)  | (0 << 8)  | (0 << 9);
   
   Transmit_String(prompt);
   
@@ -248,7 +227,6 @@ void Transmit_String(char str[]) {
 
 void configureUART(void) {
   RCC->APB1ENR |= RCC_APB1ENR_USART3EN; // enable USART
-  RCC->AHBENR  |= RCC_AHBENR_GPIOCEN; // Enable peripheral clock to GPIOC
   
   // configure USART
   USART3->BRR = HAL_RCC_GetHCLKFreq()/115200; // set baud rate to 115200 bits/second
@@ -259,6 +237,31 @@ void configureUART(void) {
   // Set PC4 and PC5 to AF mode and AF1
   GPIOC->MODER  |= (1 << 11) | (1 << 9);
   GPIOC->AFR[0] |= (1 << 20) | (1 << 16);
+}
+
+void configureI2C2(void) {
+  
+  GPIOB->MODER |= (1 << 23) | (1 << 27) | (1 << 28); // PB11 AF, PB13 AF, PB14 output
+  GPIOC->MODER |= (1 << 0);  // PC0 output
+  GPIOC->MODER   |= (1 << 12)   | (1 << 14)
+                |  (1 << 16)  | (1 << 18) ; // initialize LEDS
+  
+  GPIOB->OTYPER |= (1 << 11) | (1 << 13);  // PB11 and PB13 open-drain
+  
+  GPIOB->PUPDR |= (1 << 22) | (1 << 26);   // PB11 and PB13 to pull-up
+  
+  GPIOB->AFR[1] |= (1 << 12) | (5 << 20);   // set PB11 to SDA and PB13 to SCL
+  
+  GPIOB->ODR |= (1 << 14);  // initialize PB14
+  GPIOC->ODR |= (1 << 0);    // initialize PC0
+  
+  /*
+   *  initialize I2C2
+   */
+  RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;  // emable the ISC2
+  
+  I2C2->TIMINGR |= (0x13 << 0) | (0xF << 8) | (0x2 << 16) | (0x4 << 20) | (1 << 28); // configure timing to 100kHz
+  I2C2->CR1 |= (1 << 0); // enable I2C2
 }
 
 /* USER CODE END 4 */

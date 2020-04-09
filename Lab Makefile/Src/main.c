@@ -101,6 +101,7 @@ int main(void)
   {
     HAL_Delay(1000);
     /* USER CODE END WHILE */
+
     
     /* USER CODE BEGIN 3 */    // ask for moisture values
     I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
@@ -112,9 +113,9 @@ int main(void)
     
     // wait for a NACKF or TXIS
     while(!(I2C2->ISR & ((1 << 4) | (1 << 1)))) {}
-    
+        Transmit_Char('g');
     // write the address of the soil sensor (0x0F)
-    I2C2->TXDR = (0xA8 << 0);
+    I2C2->TXDR = (0x0F << 0);
 
     // wait for NACKF or TXIS
     while(!(I2C2->ISR & ((1 << 4) | (1 << 1)))) {}
@@ -150,7 +151,7 @@ int main(void)
     while(!(I2C2->ISR & ((1 << 2) | (1 << 1)))) {}
     
     cap_high = (I2C2->RXDR << 8);
-    sprintf(buffer, "%d", cap_high | cap_low);
+    sprintf(buffer, "%d", cap_high);
     Transmit_String(buffer);
     Transmit_Char(' ');
       
@@ -158,14 +159,14 @@ int main(void)
     while(!(I2C2->ISR & (1 << 6))) {}
 
     if(cap_low > 200) {
-      GPIOC->ODR |= (1 << 9);
+      //GPIOC->ODR |= (1 << 9);
       // GPIOC->ODR &= ~(1 << 7);
     }
     if(cap_high != 0) {
-      GPIOC->ODR |= (1 << 8);
+      //GPIOC->ODR |= (1 << 8);
     }
     if((cap_high | cap_low) != 0) {
-      GPIOC->ODR |= (1 << 7);
+      //GPIOC->ODR |= (1 << 7);
     }
   }
   /* USER CODE END 3 */

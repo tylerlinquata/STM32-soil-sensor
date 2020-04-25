@@ -90,30 +90,31 @@ int main(void)
   // all LEDS off
   GPIOC->ODR |= (0 << 6)   | (0 << 7)  | (0 << 8)  | (0 << 9);
   
-  Transmit_String(prompt);
+  HAL_Delay(500);
+  
+  GPIOC->ODR |= (1 << 6);
   
   /* USER CODE END 2 */
   
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint16_t cap_low, cap_high, cap;
+  char buffer[sizeof(int) * 4 + 1];
+  uint16_t cap, cap_low, cap_high, temp_low, temp_high;
+  int num = 0;
   while (1)
   {
-    HAL_Delay(1000);
     /* USER CODE END WHILE */
 
-    
-    /* USER CODE BEGIN 3 */    // ask for moisture values
+    /* USER CODE BEGIN 3 */
     I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
     I2C2->CR2 |= (0x36 << 1); // set slave address to 0x6B
     I2C2->CR2 |= (2 << 16);    // set number of bytes to 2
     I2C2->CR2 &= ~(1 << 10);  // set RD_WRN to write
     I2C2->CR2 |= (1 << 13);    // set the start bit
-    
-    
+
     // wait for a NACKF or TXIS
     while(!(I2C2->ISR & ((1 << 4) | (1 << 1)))) {}
-        Transmit_Char('g');
+
     // write the address of the soil sensor (0x0F)
     I2C2->TXDR = (0x0F << 0);
 
@@ -125,13 +126,12 @@ int main(void)
 
     // wait for TC
     while(!(I2C2->ISR & (1 << 6))) {}
-  
-    // set the stop bit
-//    I2C2->CR2 |= (1 << 14);
-      
+    
+    HAL_Delay(1000);
+
     // read in moisture value
     I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-    I2C2->CR2 |= (0x36 << 1); // set slave address to 0x6B
+    I2C2->CR2 |= (0x36 << 1); // set slave address to 0x36
     I2C2->CR2 |= (2 << 16);    // set number of bytes to 2
     I2C2->CR2 |= (1 << 10);    // set RD_WRN to read
     I2C2->CR2 |= (1 << 13);    // set the start bit
@@ -142,32 +142,81 @@ int main(void)
     // read in data
     cap_low = I2C2->RXDR;
 
-    char buffer[sizeof(int) * 4 + 1];
-    sprintf(buffer, "%d", cap_low);
-    Transmit_String(buffer);
-    Transmit_Char(' ');
-    
     // wait for RXNE or NACKF
     while(!(I2C2->ISR & ((1 << 2) | (1 << 1)))) {}
-    
+
     cap_high = (I2C2->RXDR << 8);
+
+    cap = cap_high | cap_low;
     sprintf(buffer, "%d", cap_high);
+    Transmit_String("Temperature: ");
+    Transmit_String(buffer);
+    Transmit_String("\n");
+    Transmit_Char(' ');
+
+    // wait for TC
+    while(!(I2C2->ISR & (1 << 6))) {}
+    
+    HAL_Delay(1000);
+    
+    // TEMP
+    
+    I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+    I2C2->CR2 |= (0x36 << 1); // set slave address to 0x6B
+    I2C2->CR2 |= (2 << 16);    // set number of bytes to 2
+    I2C2->CR2 &= ~(1 << 10);  // set RD_WRN to write
+    I2C2->CR2 |= (1 << 13);    // set the start bit
+
+    // wait for a NACKF or TXIS
+    while(!(I2C2->ISR & ((1 << 4) | (1 << 1)))) {}
+
+    // write the address of the soil sensor (0x0F)
+    I2C2->TXDR = (0x00 << 0);
+
+    // wait for NACKF or TXIS
+    while(!(I2C2->ISR & ((1 << 4) | (1 << 1)))) {}
+
+    // write the address of the touch function (0x10)
+    I2C2->TXDR = (0x04 << 0);
+
+    // wait for TC
+    while(!(I2C2->ISR & (1 << 6))) {}
+    
+    HAL_Delay(1000);
+
+    // read in moisture value
+    I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+    I2C2->CR2 |= (0x36 << 1); // set slave address to 0x36
+    I2C2->CR2 |= (2 << 16);    // set number of bytes to 2
+    I2C2->CR2 |= (1 << 10);    // set RD_WRN to read
+    I2C2->CR2 |= (1 << 13);    // set the start bit
+
+    // wait for RXNE or NACKF
+    while(!(I2C2->ISR & ((1 << 2) | (1 << 1)))) {}
+
+    // read in data
+    temp_low = I2C2->RXDR;
+
+    // wait for RXNE or NACKF
+    while(!(I2C2->ISR & ((1 << 2) | (1 << 1)))) {}
+
+    temp_high = (I2C2->RXDR << 8);
+
+    sprintf(buffer, "%d", temp_high);
+    Transmit_String("Capacitance: ");
     Transmit_String(buffer);
     Transmit_Char(' ');
-      
+
     // wait for TC
     while(!(I2C2->ISR & (1 << 6))) {}
 
-    if(cap_low > 200) {
-      //GPIOC->ODR |= (1 << 9);
-      // GPIOC->ODR &= ~(1 << 7);
-    }
-    if(cap_high != 0) {
-      //GPIOC->ODR |= (1 << 8);
-    }
-    if((cap_high | cap_low) != 0) {
-      //GPIOC->ODR |= (1 << 7);
-    }
+    
+//    sprintf(buffer, "%d", num);
+//    Transmit_String(buffer);
+//    Transmit_Char(' ');
+    
+    num = num + 1;
+    HAL_Delay(1000);
   }
   /* USER CODE END 3 */
   

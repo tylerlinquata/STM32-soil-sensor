@@ -1,4 +1,4 @@
-/**
+ /**
  ******************************************************************************
  * File Name          : main.c
  * Description        : Main program body
@@ -54,6 +54,19 @@ void Transmit_String(char str[]);
 void configureUART(void);
 void configureI2C2(void);
 char prompt[6] = {'C', 'M', 'D', '?', '\0'};
+
+//motor globals
+void ConfigureMotorOutput(void);
+void CheckMoisture(void);
+void MotorRoutines(void);
+void RoutineA(void);
+void RoutineB(void);
+void RoutineC(void);
+int samples = 10;
+int sum_samples;
+int avg_samples;
+int temp_samples;
+int avg_temp;
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
@@ -93,6 +106,8 @@ int main(void)
   HAL_Delay(500);
   
   GPIOC->ODR |= (1 << 6);
+	
+	ConfigureMotorOutput();
   
   /* USER CODE END 2 */
   
@@ -101,8 +116,22 @@ int main(void)
   char buffer[sizeof(int) * 4 + 1];
   uint16_t cap, cap_low, cap_high, temp_low, temp_high;
   int num = 0;
+	sum_samples = 0;
+	int sample_count = 0;
+	temp_samples = 0;
+	
   while (1)
   {
+		if (sample_count >= (samples - 1)) {
+			
+			avg_samples = sum_samples / sample_count;
+			avg_temp = temp_samples / sample_count;
+			CheckMoisture();
+			sum_samples = 0;
+			sample_count = 0;
+			temp_samples = 0;
+		
+		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -145,10 +174,12 @@ int main(void)
     // wait for RXNE or NACKF
     while(!(I2C2->ISR & ((1 << 2) | (1 << 1)))) {}
 
-    cap_high = (I2C2->RXDR << 8);
-
-    cap = cap_high | cap_low;
-    sprintf(buffer, "%d", cap_high);
+    //cap_high = (I2C2->RXDR << 8); //old
+    //cap = cap_high | cap_low;	//old
+    //sprintf(buffer, "%d", cap_high/100); //old		
+		
+		temp_high = (I2C2->RXDR << 8);  //new
+		sprintf(buffer, "%d", temp_high/100); //new
     Transmit_String("Temperature: ");
     Transmit_String(buffer);
     Transmit_String("\n");
@@ -200,9 +231,10 @@ int main(void)
     // wait for RXNE or NACKF
     while(!(I2C2->ISR & ((1 << 2) | (1 << 1)))) {}
 
-    temp_high = (I2C2->RXDR << 8);
-
-    sprintf(buffer, "%d", temp_high);
+    //temp_high = (I2C2->RXDR << 8); //Old
+    //sprintf(buffer, "%d", temp_high); //Old
+		cap_high = (I2C2->RXDR << 8); //New
+		sprintf(buffer, "%d", cap_high); //New
     Transmit_String("Capacitance: ");
     Transmit_String(buffer);
     Transmit_Char(' ');
@@ -216,6 +248,9 @@ int main(void)
 //    Transmit_Char(' ');
     
     num = num + 1;
+		sample_count = sample_count +1;
+		sum_samples = sum_samples + cap_high;
+		temp_samples = temp_samples + temp_high;
     HAL_Delay(1000);
   }
   /* USER CODE END 3 */
@@ -321,6 +356,88 @@ void configureI2C2(void) {
   I2C2->TIMINGR |= (0x13 << 0) | (0xF << 8) | (0x2 << 16) | (0x4 << 20) | (1 << 28); // configure timing to 100kHz
   I2C2->CR1 |= (1 << 0); // enable I2C2
 }
+
+//Simulates the interrupt from a properly working sensor
+void CheckMoisture(void) {
+	
+	int threshold1 = 28000;
+	if (avg_temp > 40) {
+		if(avg_samples <= threshold1) {
+			MotorRoutines(); //TODO
+		}
+	}
+
+}
+
+ /*
+	* Motor Routines
+	*/
+
+//normally the sensor would trigger an interrupt below a certain level and then 
+//we'd examine the exact moisture level to determine the routine 
+void MotorRoutines(void) {
+	
+		//higher thresholds mean higher moisture level
+	//the lower the current moisture, the longer the motor needs to run
+	int threshold1 = 28000;
+	int threshold2 = 25000;
+	int threshold3 = 20000;
+	
+	if (avg_samples <= threshold3 ) {
+		RoutineC();
+		return;
+	}
+	
+	if (avg_samples <= threshold2) {
+		RoutineB();
+		return;
+	}
+	
+	if (avg_samples <= threshold1) {
+		RoutineA();
+		return;		
+	}
+	
+	return;
+
+}
+
+// minimal moisture required
+void RoutineA(void) {
+	//write PC3 high
+	GPIOC->ODR |= (0x1 << 3);
+	HAL_Delay(5000);
+	//write PC3 Low
+	GPIOC->ODR &= ~(0x1 << 3); 
+}
+
+//medium moisture required
+void RoutineB(void) {
+	//WRite PC3 High
+	GPIOC->ODR |= (0x1 << 3);
+	HAL_Delay(10000);
+	//Write PC3 Low
+	GPIOC->ODR &= ~(0x1 << 3); 
+}
+
+//lots of moisture required
+void RoutineC(void) {
+	//Write PC3 High
+	GPIOC->ODR |= (0x1 << 3);
+	HAL_Delay(20000);
+	//Write PC3 Low
+	GPIOC->ODR &= ~(0x1 << 3); 
+}
+
+void ConfigureMotorOutput(void) {  
+	//Set PC3 to (b01) GeneralPurposeOutputMode
+	GPIOC->MODER |= (0x01 << 6);
+	GPIOC->OTYPER &= ~(0x1 << 3);
+	GPIOC->PUPDR &= ~(0x3 << 6);
+	GPIOC->ODR &= ~(0x1 << 3); 
+
+}
+
 
 /* USER CODE END 4 */
 
